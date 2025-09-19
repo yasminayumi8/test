@@ -1,16 +1,12 @@
-from symtable import Class
-
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Boolean, Date
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import scoped_session, sessionmaker, relationship, declarative_base
+from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 from werkzeug.security import check_password_hash, generate_password_hash
 
 engine = create_engine('sqlite:///projeto.sqlite3')
 SessionLocal = sessionmaker(bind=engine)
 
-#db_session = scoped_session(sessionmaker(bind=engine))
 Base = declarative_base()
-#Base.query = db_session.query_property()
 
 class Produto(Base):
     __tablename__ = 'produtos'
@@ -38,16 +34,17 @@ class Produto(Base):
         db_session.commit()
 
     def serialize_produto(self):
-        dados_produto = {
-            'id_produto' : self.id_produto,
-            'nome_produto' : self.nome_produto,
-            'dimensao_produto' : self.dimensao_produto,
-            'preco_produto' : self.preco_produto,
-            'peso_produto' : self.peso_produto,
-            'cor_produto' : self.cor_produto,
-            'descricao_produto' : self.descricao_produto,
+        return {
+            'id_produto': self.id_produto,
+            'nome_produto': self.nome_produto,
+            'dimensao_produto': self.dimensao_produto,
+            'preco_produto': self.preco_produto,
+            'peso_produto': self.peso_produto,
+            'cor_produto': self.cor_produto,
+            'descricao_produto': self.descricao_produto,
         }
         return dados_produto
+
 
 class Usuario(Base):
     __tablename__ = 'usuarios'
@@ -55,7 +52,7 @@ class Usuario(Base):
     nome = Column(String)
     CPF = Column(String(11), nullable=False, index=True)
     email = Column(String(30), nullable=False, index=True)
-    password_hash = Column(String(30), nullable=False, index=True)
+    password_hash = Column(String(128), nullable=False, index=True)  # aumentado o tamanho
     papel = Column(String, default="usuario")
 
     def __repr__(self):
@@ -80,28 +77,30 @@ class Usuario(Base):
         db_session.commit()
 
     def serialize_usuario(self):
-        dados_usuario = {
-            'id' : self.id,
-            'nome' : self.nome,
-            'CPF' : self.CPF,
-            'email' : self.email,
-            'password_hash' : self.password_hash,
-            'papel' : self.papel,
+        return {
+            'id': self.id,
+            'nome': self.nome,
+            'CPF': self.CPF,
+            'email': self.email,
+            'password_hash': self.password_hash,
+            'papel': self.papel,
         }
         return dados_usuario
 
-
 class Movimentacao(Base):
     __tablename__ = 'movimentacao'
-    ID_movimentacao = Column(Integer,primary_key=True)
+    ID_movimentacao = Column(Integer, primary_key=True)
     quantidade = Column(Integer, nullable=False, index=True)
-    id_produto = Column(Integer)
-    data1 = Column(String(11), nullable=False, index=True)
+    produto_id = Column(Integer, ForeignKey('produtos.id_produto'), nullable=False, index=True)
+    data = Column(Date, nullable=False, index=True)  # agora tipo Date
     status = Column(Boolean, nullable=False, index=True, default=False)
     usuario_id = Column(Integer, ForeignKey('usuarios.id'))
 
+    usuario = relationship('Usuario')
+    produto = relationship('Produto')
+
     def __repr__(self):
-        return '<funcionarios: {} {}>'.format(self.ID_movimentacao,self.quantidade, self.id_produto, self.data1, self.status, self.produto)
+        return f'<movimentacao: {self.ID_movimentacao} {self.quantidade} {self.produto_id} {self.data} {self.status} {self.usuario_id}>'
 
     def save(self, db_session):
         try:
@@ -116,29 +115,41 @@ class Movimentacao(Base):
         db_session.commit()
 
     def serialize_movimentacao(self):
-        dados_movimentacao = {
-            'ID_movimentacao' : self.ID_movimentacao,
-            'id_produto': self.id_produto,
-            'data1': self.data1,
-            'status': self.status,
+        return {
+            'ID_movimentacao': self.ID_movimentacao,
             'quantidade': self.quantidade,
             'produto_id': self.produto_id,
+            'data': self.data.isoformat(),
+            'status': self.status,
+            'usuario_id': self.usuario_id,
         }
         return dados_movimentacao
 
 
 class Pedido(Base):
     __tablename__ = 'pedido'
+
     ID_pedido = Column(Integer, primary_key=True)
-    usuario_id = Column(Integer)
-    id_produto = Column(Integer)
-    vendedor_id = Column(Integer)
+    produto_id = Column(Integer, ForeignKey('produtos.id_produto'))
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'))
+    vendedor_id = Column(Integer, ForeignKey('usuarios.id'))
     quantidade = Column(Integer, nullable=False, index=True)
     valor_total = Column(Integer, nullable=False, index=True)
     endereco = Column(String(40), nullable=False, index=True)
 
+    produto = relationship('Produto')
+    usuario = relationship('Usuario', foreign_keys=[usuario_id])
+    vendedor = relationship('Usuario', foreign_keys=[vendedor_id])
+
     def __repr__(self):
-        return '<pedido: {} {} {} {} {} {}>'. format(self.ID_pedido, self.id_produto, self.quantidade, self.valor_total, self.endereco, self.vendedor_id)
+        return '<pedido: {} {} {} {} {} {}>'.format(
+            self.ID_pedido,
+            self.produto_id,
+            self.quantidade,
+            self.valor_total,
+            self.endereco,
+            self.vendedor_id
+        )
 
     def save(self, db_session):
         try:
@@ -153,16 +164,17 @@ class Pedido(Base):
         db_session.commit()
 
     def serialize_pedido(self):
-        dados_pedido = {
+        return {
             'ID_pedido': self.ID_pedido,
-            'usuario_id': self.usuario_id,
             'produto_id': self.produto_id,
+            'usuario_id': self.usuario_id,
+            'vendedor_id': self.vendedor_id,
             'quantidade': self.quantidade,
             'valor_total': self.valor_total,
-            'endereco': self.endereco,
-            'vendedor_id': self.vendedor_id,
+            'endereco': self.endereco
         }
         return dados_pedido
+
 
 class Blog(Base):
     __tablename__ = 'blog'
@@ -173,7 +185,7 @@ class Blog(Base):
     data = Column(String(255), nullable=False, index=True)
 
     def __repr__(self):
-        return '<blog: {} {} {} {} {}>'.format(self.id_blog,self.usuario_id, self.titulo, self.data, self.comentario)
+        return '<blog: {} {} {} {} {}>'.format(self.id_blog, self.usuario_id, self.titulo, self.data, self.comentario)
 
     def save(self, db_session):
         try:
@@ -188,17 +200,18 @@ class Blog(Base):
         db_session.commit()
 
     def serialize_blog(self):
-        dados_blog = {
+        return {
             'id_blog': self.id_blog,
-            'usuario_id' : self.usuario_id,
-            'titulo' : self.titulo,
-            'data' : self.data,
-            'comentario' : self.comentario,
+            'usuario_id': self.usuario_id,
+            'titulo': self.titulo,
+            'data': self.data,
+            'comentario': self.comentario,
         }
         return dados_blog
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+
 
 if __name__ == '__main__':
     init_db()
