@@ -263,26 +263,354 @@ def consulta_usuario(id):
 
 @app.route('/consulta/produto/<int:id>', methods=['GET'])
 def consulta_produto(id):
+    db = SessionLocal()
     try:
-        var_produto = select(Produto).where(Produto.id == id)
-        var_produto = db_session.execute(var_produto).scalar()
-        print(var_produto)
+        # busca o produto pelo id_produto
+        var_produto = db.execute(
+            select(Produto).where(Produto.id_produto == id)
+        ).scalars().first()
+
+        # se não encontrar, retorna 404
+        if not var_produto:
+            return jsonify({'mensagem': 'Produto não encontrado'}), 404
+
+        # monta o dicionário com os dados
         produto_resultado = {
-            "nome": var_produto.nome,
-            "dimensao": var_produto.dimensao,
-            "preco": var_produto.preco,
-            "peso": var_produto.peso,
-            "cor": var_produto.cor,
-            "descricao": var_produto.descricao,
+            "id_produto": var_produto.id_produto,
+            "nome_produto": var_produto.nome_produto,
+            "dimensao_produto": var_produto.dimensao_produto,
+            "preco_produto": var_produto.preco_produto,
+            "peso_produto": var_produto.peso_produto,
+            "cor_produto": var_produto.cor_produto,
+            "descricao_produto": var_produto.descricao_produto,
         }
-        print(produto_resultado)
-        return jsonify({'Produto' :produto_resultado}),200
-    except ValueError:
-        return jsonify({'mensagem':'Erro de cadasro'}), 400
+
+        return jsonify({'Produto': produto_resultado}), 200
+
+    except Exception as e:
+        return jsonify({'mensagem': f'Erro de consulta: {str(e)}'}), 400
+
+    finally:
+        db.close()
 
 
+@app.route('/consulta/blog/<int:id>', methods=['GET'])
+def consulta_blog_id(id):
+    db = SessionLocal()
+    try:
+        var_blog = select(Blog).where(Blog.usuario_id == id)
+        var_blog = db.execute(var_blog).scalar()
+
+        if not var_blog:
+            return jsonify({'mensagem': 'Blog não encontrado'}), 404
+
+        blog_resultado = {
+            "usuario_id": var_blog.usuario_id,
+            "comentario": var_blog.comentario,
+            "titulo": var_blog.titulo,
+            "data": var_blog.data,
+        }
+        return jsonify({'blog': blog_resultado}), 200
+    except Exception as e:
+        return jsonify({'mensagem': f'Erro de consulta: {str(e)}'}), 400
+    finally:
+        db.close()
+
+@app.route('/consulta/pedido/<int:id>', methods=['GET'])
+def consulta_pedido_id(id):
+    db = SessionLocal()
+    try:
+        var_pedido = select(Pedido).where(Pedido.ID_pedido == id)
+        var_pedido = db.execute(var_pedido).scalars().first()
+
+        if not var_pedido:
+            return jsonify({'mensagem': 'Pedido não encontrado'}), 404
+
+        pedido_resultado = var_pedido.serialize_pedido()
+
+        return jsonify({'pedido': pedido_resultado}), 200
+    except Exception as e:
+        return jsonify({'mensagem': f'Erro interno: {str(e)}'}), 500
+    finally:
+        db.close()
+
+@app.route('/consulta/movimentacao/<int:id>', methods=['GET'])
+def consulta_movimentacao_id(id):
+    db = SessionLocal()
+    try:
+        var_movimentacao = select(Movimentacao).where(Movimentacao.ID_movimentacao == id)
+        var_movimentacao = db.execute(var_movimentacao).scalars().first()
+
+        if not var_movimentacao:
+            return jsonify({'mensagem': 'Movimentação não encontrada'}), 404
+
+        movimentacao_resultado = var_movimentacao.serialize_movimentacao()
+
+        return jsonify({'movimentacao': movimentacao_resultado}), 200
+    except Exception as e:
+        return jsonify({'mensagem': f'Erro interno: {str(e)}'}), 500
+    finally:
+        db.close()
 
 
+@app.route('/lista/usuario', methods=['GET'])
+def lista_usuario():
+    db = SessionLocal()
+    try:
+        resultado = db.execute(select(Usuario)).scalars()
+        usuarios = [
+            {
+                "id": u.id,
+                "nome": u.nome,
+                "email": u.email
+            }
+            for u in resultado
+        ]
+        return jsonify({'usuarios': usuarios}), 200
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 400
+    finally:
+        db.close()
+
+
+@app.route('/lista/produto/', methods=['GET'])
+def lista_produto():
+    db = SessionLocal()  # Cria a sessão
+    try:
+        resultado = db.execute(select(Produto)).scalars()  # Pega todos os produtos
+        produtos = [
+            {
+                "id_produto": p.id_produto,
+                "nome_produto": p.nome_produto,
+                "dimensao_produto": p.dimensao_produto,
+                "preco_produto": p.preco_produto,
+                "peso_produto": p.peso_produto,
+                "cor_produto": p.cor_produto,
+                "descricao_produto": p.descricao_produto
+            }
+            for p in resultado
+        ]
+        return jsonify({'produtos': produtos}), 200
+    except SQLAlchemyError as e:
+        return jsonify({'erro': str(e)}), 400
+    finally:
+        db.close()  # Fecha a sessão
+
+from flask import Flask, jsonify
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+
+@app.route('/lista/blog/', methods=['GET'])
+def lista_blog():
+    db = SessionLocal()  # Cria a sessão
+    try:
+        resultado = db.execute(select(Blog)).scalars()  # Pega todos os blogs
+        blogs = [
+            {
+                "id_blog": b.id_blog,
+                "usuario_id": b.usuario_id,
+                "titulo": b.titulo,
+                "data": b.data,
+                "comentario": b.comentario
+            }
+            for b in resultado
+        ]
+        return jsonify({'blogs': blogs}), 200
+    except SQLAlchemyError as e:
+        return jsonify({'erro': str(e)}), 400
+    finally:
+        db.close()  # Fecha a sessão
+
+
+@app.route('/lista/pedido/', methods=['GET'])
+def lista_pedido():
+    db = SessionLocal()  # Cria a sessão
+    try:
+        resultado = db.execute(select(Pedido)).scalars()  # Pega todos os pedidos
+        pedidos = [
+            {
+                "ID_pedido": p.ID_pedido,
+                "produto_id": p.produto_id,
+                "usuario_id": p.usuario_id,
+                "vendedor_id": p.vendedor_id,
+                "quantidade": p.quantidade,
+                "valor_total": p.valor_total,
+                "endereco": p.endereco
+            }
+            for p in resultado
+        ]
+        return jsonify({'pedidos': pedidos}), 200
+    except SQLAlchemyError as e:
+        return jsonify({'erro': str(e)}), 400
+    finally:
+        db.close()  # Fecha a sessão
+
+
+@app.route('/lista/movimentacao/', methods=['GET'])
+def lista_movimentacao():
+    db = SessionLocal()  # Cria a sessão
+    try:
+        resultado = db.execute(select(Movimentacao)).scalars()  # Pega todas as movimentações
+        movimentacoes = [
+            {
+                "ID_movimentacao": m.ID_movimentacao,
+                "quantidade": m.quantidade,
+                "produto_id": m.produto_id,
+                "data": m.data.isoformat(),  # converte Date para string JSON
+                "status": m.status,
+                "usuario_id": m.usuario_id
+            }
+            for m in resultado
+        ]
+        return jsonify({'movimentacoes': movimentacoes}), 200
+    except SQLAlchemyError as e:
+        return jsonify({'erro': str(e)}), 400
+    finally:
+        db.close()  # Fecha a sessão
+
+
+@app.route('/atualizar/usuario/<int:id_usuario>', methods=['PUT'])
+def atualizar_usuario(id_usuario):
+    db = SessionLocal()  # Cria a sessão
+    try:
+        usuario = db.execute(
+            select(Usuario).where(Usuario.id == id_usuario)
+        ).scalar()
+
+        if not usuario:
+            return jsonify({'erro': 'Usuário não encontrado'}), 404
+
+        dados = request.get_json()
+
+        # Verifica se todos os campos obrigatórios estão presentes
+        campos_obrigatorios = ['nome', 'cpf', 'email', 'papel']
+        if not all(dados.get(campo) for campo in campos_obrigatorios):
+            return jsonify({"erro": "Preencher todos os campos obrigatórios"}), 400
+
+        # Atualiza os campos
+        usuario.nome = dados['nome']
+        usuario.cpf = dados['cpf']
+        usuario.email = dados['email']
+        usuario.papel = dados['papel']
+
+        # Atualiza a senha se fornecida
+        if 'password' in dados and dados['password']:
+            usuario.set_password(dados['password'])
+
+        db.commit()
+        return jsonify({"mensagem": "Usuário atualizado com sucesso"}), 200
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        return jsonify({'erro': str(e)}), 400
+    finally:
+        db.close()  # Garante que a sessão seja fechada
+
+
+@app.route('/atualizar/produto/<int:id_produto>', methods=['PUT'])
+def atualizar_produto(id_produto):
+    db = SessionLocal()  # Cria a sessão
+    try:
+        produto = db.execute(
+            select(Produto).where(Produto.id_produto == id_produto)
+        ).scalar()
+
+        if not produto:
+            return jsonify({'erro': 'Produto não encontrado'}), 404
+
+        dados = request.get_json()
+
+        # Verifica se todos os campos obrigatórios estão presentes
+        campos_obrigatorios = ['nome_produto', 'dimensao_produto', 'preco_produto', 'peso_produto', 'descricao_produto']
+        if not all(dados.get(campo) for campo in campos_obrigatorios):
+            return jsonify({"erro": "Preencher todos os campos obrigatórios"}), 400
+
+        # Atualiza os campos
+        produto.nome_produto = dados['nome_produto']
+        produto.dimensao_produto = dados['dimensao_produto']
+        produto.preco_produto = dados['preco_produto']
+        produto.peso_produto = dados['peso_produto']
+        produto.cor_produto = dados.get('cor_produto')  # opcional
+        produto.descricao_produto = dados['descricao_produto']
+
+        db.commit()
+        return jsonify({"mensagem": "Produto atualizado com sucesso"}), 200
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        return jsonify({'erro': str(e)}), 400
+    finally:
+        db.close()  # Fecha a sessão
+
+
+@app.route('/atualizar/blog/<int:id_blog>', methods=['PUT'])
+def atualizar_blog(id_blog):
+    db = SessionLocal()  # Cria a sessão
+    try:
+        blog = db.execute(
+            select(Blog).where(Blog.id_blog == id_blog)
+        ).scalar()
+
+        if not blog:
+            return jsonify({'erro': 'Blog não encontrado'}), 404
+
+        dados = request.get_json()
+
+        # Verifica se todos os campos obrigatórios estão presentes
+        campos_obrigatorios = ['titulo', 'data', 'comentario']
+        if not all(dados.get(campo) for campo in campos_obrigatorios):
+            return jsonify({"erro": "Preencher todos os campos obrigatórios"}), 400
+
+        # Atualiza os campos
+        blog.titulo = dados['titulo']
+        blog.data = dados['data']
+        blog.comentario = dados['comentario']
+        blog.usuario_id = dados.get('usuario_id', blog.usuario_id)  # mantém valor antigo se não fornecido
+
+        db.commit()
+        return jsonify({"mensagem": "Blog atualizado com sucesso"}), 200
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        return jsonify({'erro': str(e)}), 400
+    finally:
+        db.close()  # Fecha a sessão
+
+
+@app.route('/atualizar/pedido/<int:id_pedido>', methods=['PUT'])
+def atualizar_pedido(id_pedido):
+    db = SessionLocal()  # Cria a sessão
+    try:
+        pedido = db.execute(
+            select(Pedido).where(Pedido.ID_pedido == id_pedido)
+        ).scalar()
+
+        if not pedido:
+            return jsonify({'erro': 'Pedido não encontrado'}), 404
+
+        dados = request.get_json()
+
+        # Campos obrigatórios
+        campos_obrigatorios = ['usuario_id', 'produto_id', 'quantidade', 'valor_total', 'endereco', 'vendedor_id']
+        if not all(dados.get(campo) for campo in campos_obrigatorios):
+            return jsonify({"erro": "Preencher todos os campos obrigatórios"}), 400
+
+        # Atualiza os campos
+        pedido.usuario_id = dados['usuario_id']
+        pedido.produto_id = dados['produto_id']
+        pedido.quantidade = dados['quantidade']
+        pedido.valor_total = dados['valor_total']
+        pedido.endereco = dados['endereco']
+        pedido.vendedor_id = dados['vendedor_id']
+
+        db.commit()
+        return jsonify({"mensagem": "Pedido atualizado com sucesso"}), 200
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        return jsonify({'erro': str(e)}), 400
+    finally:
+        db.close()  # Fecha a sessão
 
 if __name__ == '__main__':
     app.run(debug=True)
