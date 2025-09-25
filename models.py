@@ -50,7 +50,7 @@ class Usuario(Base):
     __tablename__ = 'usuarios'
     id = Column(Integer, primary_key=True)
     nome = Column(String)
-    CPF = Column(String(11), nullable=False, index=True)
+    CPF = Column(String(11), nullable=False, unique=True, index=True)
     email = Column(String(30), nullable=False, index=True)
     password_hash = Column(String(128), nullable=False, index=True)  # aumentado o tamanho
     papel = Column(String, default="usuario")

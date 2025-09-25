@@ -6,7 +6,8 @@ from flask_pydantic_spec import FlaskPydanticSpec
 from flask_jwt_extended import get_jwt_identity, JWTManager, create_access_token, jwt_required
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.testing import db
+from models import SessionLocal
+
 
 from models import SessionLocal, Usuario, Produto, Blog, Movimentacao, Pedido
 
@@ -22,16 +23,13 @@ jwt = JWTManager(app)
 def admin_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        current_user = get_jwt_identity()
-        print(f'c_user: {current_user}')
+        user_email = get_jwt_identity()
         db = SessionLocal()
         try:
-            sql = select(Usuario).where(Usuario.email == current_user)
-            user = db.execute(sql).scalar()
-            print(f'teste admin: {user and user.papel == "usuario"} {user.papel}')
-            if user and user.papel == "usuario":
-                return fn(*args, **kwargs)
-            return jsonify({"msg":"Acesso negado"}),403
+            user = db.execute(select(Usuario).where(Usuario.email == user_email)).scalar()
+            if user and user.papel != "admin":
+                return jsonify({"msg": "Acesso negado"}), 403
+            return fn(*args, **kwargs)
         finally:
             db.close()
     return wrapper
@@ -52,18 +50,16 @@ def login():
 
         email = dados['email']
         password_hash = dados['password_hash']
-        print(f'email: {email}')
-        print(f'password_hash: {password_hash}')
+
 
         db = SessionLocal()
 
 
         sql = select(Usuario).where(Usuario.email == email)
         user = db.execute(sql).scalar()
-        print(f'user: {user}')
+
 
         if user and user.check_password(password_hash):
-            print("if login")
             access_token = create_access_token(identity=str(user.email))
             return jsonify({
                 "access_token": access_token,
@@ -106,7 +102,7 @@ def cadastrar_usuario():
         db.close()
 
 @app.route('/cadastro/produto',methods=['POST'])
-
+@jwt_required()
 def cadastro_produto():
 
     dados = request.get_json()
@@ -114,7 +110,7 @@ def cadastro_produto():
     try:
         if not dados['nome_produto'] or not dados['dimensao_produto'] or not dados['preco_produto'] or not \
         dados['peso_produto'] or not dados['cor_produto'] or not dados['descricao_produto']:
-            return jsonify({"error", "preencher todos os campos"}), 400
+            return jsonify({"error" : "preencher todos os campos"}), 400
 
         novo_produto = Produto(
                 nome_produto=dados['nome_produto'],
@@ -135,6 +131,7 @@ def cadastro_produto():
 
 
 @app.route('/cadastro/blog', methods=['POST'])
+@jwt_required()
 def cadastro_blog():
 
 
@@ -162,6 +159,8 @@ def cadastro_blog():
 
 
 @app.route('/cadastro/movimentacao', methods=['POST'])
+@jwt_required()
+@admin_required
 def cadastro_movimentacao():
     dados = request.get_json()
     db = SessionLocal()
@@ -197,6 +196,7 @@ def cadastro_movimentacao():
         db.close()
 
 @app.route('/cadastro/pedido', methods=['POST'])
+@jwt_required()
 def cadastro_pedido():
     db = SessionLocal()
     try:
@@ -244,12 +244,15 @@ def cadastro_pedido():
 
 
 @app.route('/consulta/usuario/<int:id>', methods=['GET'])
+@jwt_required()
 def consulta_usuario(id):
     db = SessionLocal()
     try:
         var_usuario = select(Usuario).where(Usuario.id == id)
-        var_usuario = db.execute(var_usuario).scalar()
-        print(var_usuario)
+        stmt = select(Usuario).where(Usuario.id == id)
+        var_usuario = db.execute(stmt).scalar()
+        if not var_usuario:
+            return jsonify({'erro': 'Usuário não encontrado'}), 404
         usuario_resultado = {
             "id": var_usuario.id,
             "nome": var_usuario.nome,
@@ -262,6 +265,7 @@ def consulta_usuario(id):
         return jsonify({'mensagem':'Erro de cadasro'}), 400
 
 @app.route('/consulta/produto/<int:id>', methods=['GET'])
+@jwt_required()
 def consulta_produto(id):
     db = SessionLocal()
     try:
@@ -295,6 +299,7 @@ def consulta_produto(id):
 
 
 @app.route('/consulta/blog/<int:id>', methods=['GET'])
+@jwt_required()
 def consulta_blog_id(id):
     db = SessionLocal()
     try:
@@ -317,6 +322,8 @@ def consulta_blog_id(id):
         db.close()
 
 @app.route('/consulta/pedido/<int:id>', methods=['GET'])
+@jwt_required()
+@admin_required
 def consulta_pedido_id(id):
     db = SessionLocal()
     try:
@@ -335,6 +342,8 @@ def consulta_pedido_id(id):
         db.close()
 
 @app.route('/consulta/movimentacao/<int:id>', methods=['GET'])
+@jwt_required()
+@admin_required
 def consulta_movimentacao_id(id):
     db = SessionLocal()
     try:
@@ -354,6 +363,7 @@ def consulta_movimentacao_id(id):
 
 
 @app.route('/lista/usuario', methods=['GET'])
+@jwt_required()
 def lista_usuario():
     db = SessionLocal()
     try:
@@ -374,6 +384,7 @@ def lista_usuario():
 
 
 @app.route('/lista/produto/', methods=['GET'])
+@jwt_required()
 def lista_produto():
     db = SessionLocal()  # Cria a sessão
     try:
@@ -401,6 +412,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 @app.route('/lista/blog/', methods=['GET'])
+@jwt_required()
 def lista_blog():
     db = SessionLocal()  # Cria a sessão
     try:
@@ -423,6 +435,8 @@ def lista_blog():
 
 
 @app.route('/lista/pedido/', methods=['GET'])
+@jwt_required()
+@admin_required
 def lista_pedido():
     db = SessionLocal()  # Cria a sessão
     try:
@@ -447,6 +461,8 @@ def lista_pedido():
 
 
 @app.route('/lista/movimentacao/', methods=['GET'])
+@jwt_required()
+@admin_required
 def lista_movimentacao():
     db = SessionLocal()  # Cria a sessão
     try:
@@ -470,6 +486,7 @@ def lista_movimentacao():
 
 
 @app.route('/atualizar/usuario/<int:id_usuario>', methods=['PUT'])
+@jwt_required()
 def atualizar_usuario(id_usuario):
     db = SessionLocal()  # Cria a sessão
     try:
@@ -483,13 +500,13 @@ def atualizar_usuario(id_usuario):
         dados = request.get_json()
 
         # Verifica se todos os campos obrigatórios estão presentes
-        campos_obrigatorios = ['nome', 'cpf', 'email', 'papel']
+        campos_obrigatorios = ['nome', 'CPF', 'email', 'papel']
         if not all(dados.get(campo) for campo in campos_obrigatorios):
             return jsonify({"erro": "Preencher todos os campos obrigatórios"}), 400
 
         # Atualiza os campos
         usuario.nome = dados['nome']
-        usuario.cpf = dados['cpf']
+        usuario.CPF = dados['CPF']
         usuario.email = dados['email']
         usuario.papel = dados['papel']
 
@@ -508,6 +525,7 @@ def atualizar_usuario(id_usuario):
 
 
 @app.route('/atualizar/produto/<int:id_produto>', methods=['PUT'])
+@jwt_required()
 def atualizar_produto(id_produto):
     db = SessionLocal()  # Cria a sessão
     try:
@@ -544,6 +562,7 @@ def atualizar_produto(id_produto):
 
 
 @app.route('/atualizar/blog/<int:id_blog>', methods=['PUT'])
+@jwt_required()
 def atualizar_blog(id_blog):
     db = SessionLocal()  # Cria a sessão
     try:
@@ -578,6 +597,7 @@ def atualizar_blog(id_blog):
 
 
 @app.route('/atualizar/pedido/<int:id_pedido>', methods=['PUT'])
+@jwt_required()
 def atualizar_pedido(id_pedido):
     db = SessionLocal()  # Cria a sessão
     try:
@@ -611,6 +631,48 @@ def atualizar_pedido(id_pedido):
         return jsonify({'erro': str(e)}), 400
     finally:
         db.close()  # Fecha a sessão
+
+@app.route('/atualizar/movimentacao/<int:id_movimentacao>', methods=['PUT'])
+@jwt_required()
+@admin_required  # se só admin pode atualizar movimentações
+def atualizar_movimentacao(id_movimentacao):
+    db = SessionLocal()
+    try:
+        movimentacao = db.execute(
+            select(Movimentacao).where(Movimentacao.ID_movimentacao == id_movimentacao)
+        ).scalar()
+
+        if not movimentacao:
+            return jsonify({'erro': 'Movimentação não encontrada'}), 404
+
+        dados = request.get_json()
+        campos_obrigatorios = ['quantidade', 'produto_id', 'data', 'status', 'usuario_id']
+        if not all(dados.get(campo) is not None for campo in campos_obrigatorios):
+            return jsonify({'erro': 'Preencher todos os campos obrigatórios'}), 400
+
+        # Atualiza os campos
+        movimentacao.quantidade = int(dados['quantidade'])
+        movimentacao.produto_id = int(dados['produto_id'])
+
+        # converte string para date
+        try:
+            movimentacao.data = datetime.strptime(dados['data'], "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({'erro': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
+
+        movimentacao.status = bool(dados['status'])
+        movimentacao.usuario_id = int(dados['usuario_id'])
+
+        db.commit()
+        return jsonify({'mensagem': 'Movimentação atualizada com sucesso',
+                        'movimentacao': movimentacao.serialize_movimentacao()}), 200
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        return jsonify({'erro': str(e)}), 400
+    finally:
+        db.close()
+
 
 if __name__ == '__main__':
     app.run(debug=True)
