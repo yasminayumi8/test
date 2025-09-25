@@ -12,11 +12,8 @@ from models import SessionLocal
 from models import SessionLocal, Usuario, Produto, Blog, Movimentacao, Pedido
 
 app = Flask(__name__)
-spec = FlaskPydanticSpec( 'Flask',
-                         title = 'Flask API',
-                         version = '1.0.0')
-spec.register(app)
-app.config['SECRET_KEY'] = 'secret!'
+app.config["JWT_SECRET_KEY"] = "secret!"  # chave usada para assinar os tokens
+app.config["JWT_TOKEN_LOCATION"] = ["headers"]  # JWT só vai ser lido dos headers
 jwt = JWTManager(app)
 
 
@@ -27,7 +24,7 @@ def admin_required(fn):
         db = SessionLocal()
         try:
             user = db.execute(select(Usuario).where(Usuario.email == user_email)).scalar()
-            if user and user.papel != "admin":
+            if user and user.papel != "adm":
                 return jsonify({"msg": "Acesso negado"}), 403
             return fn(*args, **kwargs)
         finally:

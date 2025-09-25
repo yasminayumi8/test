@@ -179,7 +179,7 @@ class Pedido(Base):
 class Blog(Base):
     __tablename__ = 'blog'
     id_blog = Column(Integer, primary_key=True)
-    usuario_id = Column(Integer)
+    usuario_id = Column(Integer, ForeignKey("usuario.id"), nullable=False)
     comentario = Column(String(255), nullable=False, index=True)
     titulo = Column(String(255), nullable=False, index=True)
     data = Column(String(255), nullable=False, index=True)
